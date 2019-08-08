@@ -1,0 +1,123 @@
+package com.xueqiu.fundx.activity.web.controller;
+
+import javax.crypto.Cipher;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.DESedeKeySpec;
+import javax.crypto.spec.IvParameterSpec;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.security.GeneralSecurityException;
+import java.security.Key;
+import java.util.Base64;
+
+/**
+ * @author zhoulibin
+ * @date 2019/8/8 5:32 PM
+ * @description
+ */
+public class SecurityHelper {
+
+
+    public static void main(String[] args) throws IOException {
+
+        System.out.println(decode("r23WWggqrTpus76nWiH+2Fj+W1sql5ol"));
+        System.out.println(encode("15504606353"));
+       // System.out.println(DateTimeUtil.formatHsDate(1534202453079l));
+
+//        System.out.println(SecurityHelper.decode("jSzdwoN7aud28B5+7V23AsepufsTtldd"));
+//        decodeFile("/Users/hakeem/card.csv","/Users/hakeem/card-d.csv");
+
+        String src = "dain234asngd中是我的那9823nksdn";
+       // String encoded = xorEncrypt("mDh4tigrHbsEadbD");
+      //  String decoded = xorDecrypt(encoded);
+        System.out.println("src:" + src);
+       // System.out.println("encoded:" + encoded);
+       // System.out.println("decoded:" + decoded);
+
+
+    }
+
+    public static String encode(String s) {
+        return TriDes.encode(s);
+    }
+
+    public static String decode(String s) {
+        return TriDes.decode(s);
+    }
+
+
+    static class TriDes {
+        private static byte[] key = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02};
+
+        private static byte[] keyiv = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+        public static byte[] encode(byte[] args) {
+            byte[] encoding;
+            try {
+                encoding = Base64.getEncoder().encode(args);
+                byte[] str = des3EncodeCBC(key, keyiv, encoding);
+                byte[] result = Base64.getEncoder().encode(str);
+                return result;
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return null;
+
+
+        }
+
+        public static String encode(String args) {
+            try {
+                return new String(encode(args.getBytes("UTF-8")), "UTF-8");
+            } catch (UnsupportedEncodingException e) {
+                e.printStackTrace();
+            }
+            return null;
+        }
+
+        public static byte[] decode(byte[] args) {
+            try {
+                byte[] decode = Base64.getDecoder().decode(args);
+                byte[] str = des3DecodeCBC(key, keyiv, decode);
+                String data = new String(str);
+                byte[] result = Base64.getDecoder().decode(data.trim().getBytes("UTF-8"));
+                return result;
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return null;
+        }
+
+        public static String decode(String args) {
+            try {
+                return new String(decode(args.getBytes("UTF-8")), "UTF-8");
+            } catch (UnsupportedEncodingException e) {
+                e.printStackTrace();
+                return null;
+            }
+        }
+
+        private static byte[] des3EncodeCBC(byte[] key, byte[] keyiv, byte[] data) throws GeneralSecurityException {
+            DESedeKeySpec spec = new DESedeKeySpec(key);
+            SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("desede");
+            Key desKey = keyFactory.generateSecret(spec);
+            Cipher cipher = Cipher.getInstance("desede/CBC/PKCS5Padding");
+            IvParameterSpec ips = new IvParameterSpec(keyiv);
+            cipher.init(Cipher.ENCRYPT_MODE, desKey, ips);
+            byte[] bout = cipher.doFinal(data);
+            return bout;
+        }
+
+        private static byte[] des3DecodeCBC(byte[] key, byte[] keyiv, byte[] data) throws GeneralSecurityException {
+            DESedeKeySpec spec = new DESedeKeySpec(key);
+            SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("desede");
+            Key desKey = keyFactory.generateSecret(spec);
+            Cipher cipher = Cipher.getInstance("desede/CBC/NoPadding");  //PKCS5Padding NoPadding
+            IvParameterSpec ips = new IvParameterSpec(keyiv);
+            cipher.init(Cipher.DECRYPT_MODE, desKey, ips);
+            byte[] bout = cipher.doFinal(data);
+            return bout;
+        }
+
+    }
+}
