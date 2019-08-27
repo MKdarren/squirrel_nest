@@ -1,0 +1,33 @@
+
+图片压缩
+
+
+    /**
+     * 图片压缩
+     * @param object 压缩之后的图片文件
+     * @param source 需要压缩的图片文件
+     * @param scale 压缩比率
+     * @throws IOException
+     */
+    public static void compress(File object, File source, double scale) throws IOException {
+        Thumbnails.of(source.getPath()).scale(scale).toFile(object.getPath());
+    }
+
+    public static void main(String[] args) {
+        try {
+            File source = new File("/Users/xueqiu/Desktop/idcard.jpg");
+            long startTime = System.currentTimeMillis();
+                compress(source, source, 0.5);
+            System.out.println(System.currentTimeMillis() - startTime);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+
+    <dependency>
+           <groupId>net.coobird</groupId>
+           <artifactId>thumbnailator</artifactId>
+           <version>0.4.8</version>
+       </dependency>
