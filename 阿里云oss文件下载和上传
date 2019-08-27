@@ -1,0 +1,140 @@
+
+##maven依赖
+<dependency>
+            <groupId>com.aliyun.oss</groupId>
+            <artifactId>aliyun-sdk-oss</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>commons-logging</groupId>
+                    <artifactId>commons-logging</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+
+
+##oss密钥配置
+        @Value("${oss-aliyun.accessKey}")
+          private String accessKey;
+          @Value("${oss-aliyun.secretKey}")
+          private String secret;
+          @Value("${oss-aliyun.bucket}")
+          private String bucket;
+          @Value("${oss-aliyun.endPoint}")
+          private String endPoint;
+
+    /**
+    * oss 下载文件
+    *
+    * @param fileName 名称中不能带空格
+    * @return InputStream
+    */
+   public byte[] download(String fileName) {
+       OSSClient ossClient = new OSSClient(endPoint, accessKey, secret);
+       OSSObject ossObject = ossClient.getObject(bucket, fileName);
+       if (ossObject.getObjectContent() == null) {
+           throw new FundxException(ErrorCode.FILE_NOT_EXIST);
+       }
+       ByteArrayOutputStream out = new ByteArrayOutputStream();
+       try {
+           InputStream in = ossObject.getObjectContent();
+           ByteStreams.copy(in, out);
+           return out.toByteArray();
+       } catch (Exception oe) {
+           logger.error("OSS_DOWNLOAD_ERROR", oe);
+       } finally {
+           try {
+               //关闭
+               ossClient.shutdown();
+               out.close();
+           } catch (IOException ignored) {
+           }
+       }
+       return null;
+   }
+
+   ##上传文件
+   /**
+    * oss 上传文件
+    *
+    * @param fileStream 文件流数据
+    * @param fileName   名称中不能带空格
+    * @param prefix     prefix 不能以/开头，必须已/结尾
+    * @return OssFile
+    */
+   public OssFile upload(InputStream fileStream, String fileName, String prefix, boolean isPublic) {
+       if (null == fileStream || prefix.startsWith("/")) {
+           return null;
+       }
+       if (!prefix.endsWith("/")) {
+           prefix = prefix + File.separator;
+       }
+       OSSClient ossClient = new OSSClient(endPoint, accessKey, secret);
+       try {
+           //封装元信息
+           ObjectMetadata meta = new ObjectMetadata();
+           meta.setContentDisposition(fileName);
+           if (isPublic) {
+               meta.setObjectAcl(CannedAccessControlList.PublicRead);
+           } else {
+               meta.setObjectAcl(CannedAccessControlList.Private);
+           }
+
+           //上传文件
+           String filePath = prefix + fileName;
+           ossClient.putObject(new PutObjectRequest(bucket, filePath, fileStream, meta));
+
+           return OssFile.create(fileName, prefix);
+       } catch (Exception oe) {
+           logger.error("OSS_UPLOAD_ERROR", oe);
+       } finally {
+           //关闭
+           ossClient.shutdown();
+       }
+       return null;
+   }
+
+
+
+
+
+
+
+
+
+##  实体类
+   @Data
+public class OssFile {
+    private String fileName;
+    @JsonIgnore
+    private String prefix;
+    private String fileKey;
+
+    private final static String urlPattern = "https://pf.danjuanapp.com/%s";
+    public final static String urlHost = "https://pf.danjuanapp.com/";
+
+    public static OssFile create(String fileName, String prefix) {
+        OssFile of = new OssFile();
+        of.setFileName(fileName);
+        of.setPrefix(prefix);
+        return of;
+    }
+
+    @JsonIgnore
+    public String getFileKey() {
+        if (fileKey == null) {
+            return prefix + fileName;
+        }
+        return fileKey;
+    }
+
+    public String getFilePath() {
+        return String.format(urlPattern, getFileKey());
+    }
+
+    public static String getFilePath(String key) {
+        return String.format(urlPattern, key);
+    }
+
+
+}

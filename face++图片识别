@@ -1,0 +1,68 @@
+//face++图片解析
+
+
+public interface FacePlusPlusApiService {
+
+    @POST("cardpp/v1/ocridcard")
+    Call<ResponseBody> orcApi(@Body RequestBody body);
+}
+
+
+@Service
+public class FaceApiService {
+
+    private XqLogger logger = XqLoggerFactory.getLogger(XqInterHttpService.class);
+
+
+    @Value("${face.apikey}")
+    private String apiKey;
+    @Value("${face.apisecret}")
+    private String apiSecret;
+    private static final String FACE_PLUS_BASE_URL = "https://api-cn.faceplusplus.com";
+    private static FacePlusPlusApiService facePlusPlusHttpService;
+
+    static {
+        Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl(FACE_PLUS_BASE_URL)
+                .build();
+
+        facePlusPlusHttpService = retrofit.create(FacePlusPlusApiService.class);
+    }
+
+    public String ocr(File file) {
+        try {
+            RequestBody requestBody = new MultipartBody.Builder().setType(MultipartBody.FORM).addFormDataPart("api_key", apiKey)
+                    .addFormDataPart("api_secret", apiSecret).
+                            addFormDataPart("image_file", file.getName(), RequestBody.create(MediaType.parse("image/*"), file)).build();
+            Response<ResponseBody> response = facePlusPlusHttpService.orcApi(requestBody).execute();
+            if (response.isSuccessful()) {
+                return response.body().string();
+            }
+            throw new Exception(ErrorCode.FACE_API_EXCEPTION, "调用face++接口失败");
+        } catch (Exception e) {
+            logger.error("调用face++接口异常", e);
+            throw new Exception(ErrorCode.FACE_API_EXCEPTION, "调用face++接口异常");
+        }
+    }
+}
+
+public void test(){
+
+File file = File.createTempFile("idcard", ".jpg");
+                  OutputStream os = new FileOutputStream(file);
+                  os.write(fileBytes);
+                  os.close();
+
+  String response = faceApiService.ocr(file);
+  JSONObject object = JSON.parseObject(response);
+  if (null != object && object.containsKey("cards")) {
+  List<CardsInfo> array = JSONObject.parseArray(object.getJSONArray("cards").toJSONString(), CardsInfo.class);
+CardsInfo cardsInfo = array != null && array.size() > 0 ? array.get(0) : new CardsInfo();
+}
+
+// 删除文件
+if (file.exists()) {
+     file.delete();
+ }
+
+ }
