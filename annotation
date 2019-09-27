@@ -1,0 +1,123 @@
+
+
+1、before
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.METHOD)
+public @interface MSDelayCheck {
+}
+
+@Aspect
+@Order(AspectOrders.MS_SLAVE_CHECK)
+@Component
+public class MasterSlaveDelayCheckInterceptor {
+
+    @Autowired
+    TDelayCheckDao tDelayCheckDao;
+    @Autowired
+    GlobalConfigFactory globalConfigFactory;
+
+    @Before("@annotation(com.xueqiu.fundx.tc.annotation.MSDelayCheck)")
+    public void before() throws Throwable {
+        TDelayCheck master = tDelayCheckDao.selectByBizTypeFromMaster(DelayCheckBizTypeEnum.FILE_CHECK.getBizType());
+        int masterCounter = master.getCounter();
+
+        // 更新
+        tDelayCheckDao.increCounterById(master.getId());
+
+        /**
+         * 默认20毫秒
+         */
+        Thread.sleep(globalConfigFactory.getLong(TcConfig.MS_DELAY_CHECK_GAP_MILS, 20));
+
+        TDelayCheck slave = tDelayCheckDao.selectByBizTypeFromSlave(DelayCheckBizTypeEnum.FILE_CHECK.getBizType());
+        int slaveCounter = slave.getCounter();
+
+        if (slaveCounter <= masterCounter) {
+            throw new Exception(ErrorCode.SLAVE_DELAYED);
+        }
+
+    }
+}
+
+2、Around
+
+@java.lang.annotation.Target({java.lang.annotation.ElementType.METHOD})
+@java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME)
+@java.lang.annotation.Documented
+public @interface TradeLocker {
+    boolean sink() default false;
+}
+
+@Aspect
+@Component
+public class TradeLockerAspect {
+
+    @Autowired
+    private RedisLockService redisLockService;
+
+    @Pointcut("@annotation(com.xueqiu.fundx.order.annotation.TradeLocker)")
+    public void logPointCut() {
+        //do nothing
+    }
+
+    @Around("logPointCut()")
+    public Object around(ProceedingJoinPoint point) throws Throwable {
+
+        MethodSignature signature = (MethodSignature) point.getSignature();
+        Method method = signature.getMethod();
+
+        TradeLocker tradeLockerAnnotation = method.getAnnotation(TradeLocker.class);
+
+        System.out.println("invoked method:"+method);
+        TradeRequest request = getTradeRequestParam(point);
+        if(request == null) {
+            throw new Exception(ErrorCode.ORDER_TRADE_ERROR);
+        }
+        try {
+            boolean ok = redisLockService.lock(request.getSerial());
+            if(!ok) {
+                throw new Exception(ErrorCode.ORDER_REPEAT_SUBMIT);
+            }
+            Object result = point.proceed();
+            if(result instanceof TradeResponse) {
+                TradeResponse response = (TradeResponse)result;
+                if(!tradeLockerAnnotation.sink()) {
+
+                    if(response.isOK()) {
+                        TradeInfoMetrics.incrNormalSuccess();
+                    } else {
+                        TradeInfoMetrics.incrFailed();
+                    }
+                } else {
+                    if(response.isOK()) {
+                        TradeInfoMetrics.incrSinkSuccess();
+                    } else {
+                        TradeInfoMetrics.incrFailed();
+                    }
+                }
+            }
+
+            return result;
+
+        } finally {
+            redisLockService.unlock(request.getSerial());
+        }
+    }
+
+    public TradeRequest getTradeRequestParam(ProceedingJoinPoint point) {
+        TradeRequest request = null;
+        Object[] args = point.getArgs();
+        if(args != null &&args.length > 0) {
+            for(Object arg: args) {
+                if(arg instanceof TradeRequest) {
+                    request = (TradeRequest)arg;
+                    break;
+                }
+            }
+        }
+        return request;
+    }
+
+
+}

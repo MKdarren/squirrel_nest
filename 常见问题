@@ -1,0 +1,26 @@
+1、final修饰的对象特点？
+
+内部new一个final对象，运行结果证明确实属性被修改了，查找资料，发现我对final的理解有误，
+对于变量来说，是指不可修改，对于对象来说，是对象的引用不可修改，以后一定要注意。
+
+2、描述下你对enum类的理解？
+
+编译后的enum类其实是一个final的class，而且默认集成了java.lang.Enum，
+因此任何enum类是不能被继承，也不能再继承其他类的。通过这个可以看出，枚举类中包含N个该枚举类的静态的final实例。
+
+javac ResultCode.java #编译得到.class文件
+javap ResultCode.class #反编译
+
+##反 编译的结果
+Compiled from "ResultCode.java"
+public final class ResultCode extends java.lang.Enum<ResultCode> {
+  public static final ResultCode SUCCESS;
+  public static final ResultCode FAIL;
+  public static final ResultCode UNAUTHORIZED;
+  public static final ResultCode NOT_FOUND;
+  public static final ResultCode INTERNAL_SERVER_ERROR;
+  int code;
+  public static ResultCode[] values();
+  public static ResultCode valueOf(java.lang.String);
+  static {};
+}
